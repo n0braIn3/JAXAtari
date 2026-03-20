@@ -1,7 +1,7 @@
 # This is adapted from Atari configuration 
 NAME_INITIALS: "RE"
 ALG_NAME: "pqn"
-TOTAL_TIMESTEPS: 1e8 # 1e8 == 100M, but times 4 (frame-skipping) -> pqn paper: enough to outperform Rainbow
+TOTAL_TIMESTEPS: 262144 #5e7 #1e8 # 1e8 == 100M, but times 4 (frame-skipping) -> pqn paper: enough to outperform Rainbow
 TOTAL_TIMESTEPS_DECAY: 5e7 # will be used for decay functions, in case you want to test for less timesteps and keep decays same
 NUM_ENVS: 1024 # parallel environments
 NUM_STEPS: 4 # steps per environment in each update

@@ -490,17 +490,16 @@ def make_train(config):
                     operand=None,
                 )
 
-            # return mean of done infos
-            done_infos = jax.tree_util.tree_map(
-                lambda x: jnp.nanmean(
-                    jnp.where(
-                        infos["returned_episode"],
-                        x.squeeze(),
-                        jnp.nan,
-                    )
-                ),
-                infos,
-            )
+            # Return mean of done infos. Some metrics are shaped [T, N, ...],
+            # while returned_episode is [T, N], so we expand the mask as needed.
+            def _masked_done_mean(x):
+                x_arr = jnp.asarray(x, dtype=jnp.float32)
+                done_mask = infos["returned_episode"]
+                while done_mask.ndim < x_arr.ndim:
+                    done_mask = done_mask[..., None]
+                return jnp.nanmean(jnp.where(done_mask, x_arr, jnp.nan))
+
+            done_infos = jax.tree_util.tree_map(_masked_done_mean, infos)
             return done_infos
 
         rng, _rng = jax.random.split(rng)

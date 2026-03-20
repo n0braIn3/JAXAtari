@@ -269,17 +269,16 @@ def make_test(config, save_params, batch_stats):
             if config.get("RECORD_VIDEO", False):
                 jax.debug.callback(video_callback, env_states, dones, 0, renderer, mod=mod),
 
-            # return mean of done infos
-            done_infos = jax.tree_util.tree_map(
-                lambda x: jnp.nanmean(
-                    jnp.where(
-                        infos["returned_episode"],
-                        x.squeeze(),
-                        jnp.nan,
-                    )
-                ),
-                infos,
-            )
+            # Some info entries can be [T, N, ...] while returned_episode is [T, N].
+            # Expand the mask rank so jnp.where broadcasts correctly for all metrics.
+            def _masked_done_mean(x):
+                done_mask = infos["returned_episode"]
+                x_arr = jnp.asarray(x)
+                while done_mask.ndim < x_arr.ndim:
+                    done_mask = done_mask[..., None]
+                return jnp.nanmean(jnp.where(done_mask, x_arr, jnp.nan))
+
+            done_infos = jax.tree_util.tree_map(_masked_done_mean, infos)
             return done_infos
 
         rng, _rng = jax.random.split(rng)
@@ -303,6 +302,11 @@ def single_run(config):
     rngs = jax.random.split(rng, config["NUM_SEEDS"])
 
     save_dir = os.path.join(config["SAVE_PATH"], env_name)
+
+    # Video rendering in debug callbacks is best-effort; cap workload for stability.
+    os.environ["VIDEO_MAX_STEPS"] = str(config.get("VIDEO_MAX_STEPS", 1000))
+    os.environ.setdefault("VIDEO_FRAME_STRIDE", "4")
+
     train_state_params = []
     batch_stats = []
     for i, rng in enumerate(rngs):
